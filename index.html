@@ -95,7 +95,7 @@
   .gtools{display:flex;flex-direction:column;gap:1rem;align-items:flex-start;font-size:.8rem;text-transform:uppercase}
   #status{min-height:1.2em}
   #grid{columns:3 280px;column-gap:1.2rem}
-  figure{break-inside:avoid;margin-bottom:1.8rem;cursor:zoom-in;opacity:0;transform:translateY(40px);
+  figure{break-inside:avoid;margin-bottom:1.8rem;cursor:pointer;opacity:0;transform:translateY(40px);
     transition:opacity .7s var(--ease),transform .7s var(--ease);filter:drop-shadow(5px 5px 0 rgba(17,17,17,.85))}
   figure.in{opacity:1;transform:none}
   .paper{position:relative;background:#f7f3ea;padding:14px 14px 38px;clip-path:var(--tear);transition:transform .5s var(--ease)}
@@ -104,10 +104,12 @@
   figure:nth-child(3n) .paper{transform:rotate(-.4deg);--tear:polygon(0 1.2%,10% 0,22% 1.5%,35% 0,50% 1.2%,65% 0,80% 1.5%,100% 0,99.2% 20%,100% 45%,99.3% 70%,100% 100%,88% 98.6%,70% 100%,52% 98.5%,34% 100%,16% 98.6%,0 100%,.8% 75%,0 50%,.8% 25%)}
   figure:hover .paper{transform:rotate(0) scale(1.03)}
   .ph{position:relative;overflow:hidden;background:var(--black)}
-  .ph img{width:100%;display:block;filter:grayscale(1) contrast(1.25);transition:transform .7s var(--ease),filter .4s}
-  .ph::before{content:"";position:absolute;inset:0;background:var(--red);mix-blend-mode:multiply;z-index:1;transform-origin:left;transition:transform .55s var(--ease)}
-  figure:hover .ph::before{transform:scaleX(0);transform-origin:right}
-  figure:hover .ph img{transform:scale(1.06);filter:none}
+  .ph img{width:100%;display:block}
+  /* ч/б слой лежит поверх цветного; по клику уезжает вправо */
+  .ph img.bw{position:absolute;inset:0;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.25);clip-path:inset(0 0 0 0);transition:clip-path .8s var(--ease)}
+  figure.color .ph img.bw{clip-path:inset(0 0 0 100%)}
+  .open{position:absolute;right:14px;bottom:7px;font:500 .72rem var(--mono);letter-spacing:.08em;text-transform:uppercase;background:none;border:0;border-bottom:2px solid var(--red);color:var(--black);cursor:pointer;padding:0 0 1px;transition:background .3s,color .3s}
+  .open:hover{background:var(--red);color:var(--cream)}
   figcaption{position:absolute;left:14px;bottom:9px;font-size:.72rem;letter-spacing:.08em;color:var(--black)}
   #status.err{color:var(--red);font-weight:500;background:var(--black);padding:.5rem .8rem;max-width:34em;text-transform:none}
 
@@ -150,10 +152,9 @@
     <h2>ФОТО</h2>
     <div class="gtools">
       <span id="count">— кадров</span>
-      <label class="btn light">Загрузить
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="square"><path d="M12 21V3M5 10l7-7 7 7"/></svg>
-        <input type="file" id="file" accept="image/*" multiple hidden>
-      </label>
+      <button type="button" class="btn light" id="pick">Загрузить
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="square"><path d="M12 21V3M5 10l7-7 7 7"/></svg></button>
+      <input type="file" id="file" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
       <span id="status"></span>
     </div>
   </div>
@@ -201,24 +202,44 @@
     files.forEach((f, i) => {
       const url = db.storage.from(BUCKET).getPublicUrl(f.name).data.publicUrl;
       const fig = document.createElement('figure');
-      fig.innerHTML = `<div class="paper"><div class="ph"><img src="${url}" loading="lazy" alt=""></div><figcaption>№ ${String(files.length - i).padStart(2,'0')}</figcaption></div>`;
-      fig.onclick = () => openBox(url);
+      fig.innerHTML = `<div class="paper"><div class="ph"><img src="${url}" loading="lazy" alt=""><img class="bw" src="${url}" loading="lazy" alt=""></div><figcaption>№ ${String(files.length - i).padStart(2,'0')}</figcaption><button class="open" type="button">Открыть ↗</button></div>`;
+      fig.onclick = e => e.target.closest('.open') ? openBox(url) : fig.classList.toggle('color');
       grid.appendChild(fig); io.observe(fig);
     });
     count.textContent = files.length + ' кадров';
     if(!noKeys) say(files.length ? '' : 'Пока пусто — загрузи первое фото');
   }
 
-  document.getElementById('file').addEventListener('change', async e => {
-    const files = [...e.target.files];
-    for(let i = 0; i < files.length; i++){
-      say(`Загружаю ${i+1} / ${files.length}…`);
-      const ext = files[i].name.split('.').pop().toLowerCase();
-      const name = Date.now() + '-' + Math.random().toString(36).slice(2,8) + '.' + ext;
-      const {error} = await db.storage.from(BUCKET).upload(name, files[i], {contentType: files[i].type || 'image/jpeg'});
-      if(error){ say(explain(error.message), true); e.target.value = ''; return; }
-    }
-    e.target.value = ''; load();
+  const fileInput = document.getElementById('file');
+  document.getElementById('pick').onclick = () => fileInput.click();
+
+  // уменьшаем и конвертируем в JPEG до загрузки (большие PNG/WebP с компьютера иначе могут не проходить)
+  async function shrink(f){
+    try{
+      const bmp = await createImageBitmap(f);
+      const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', .88));
+      if(blob) return {body: blob, ext: 'jpg', type: 'image/jpeg'};
+    }catch(_){}
+    return {body: f, ext: (f.name.split('.').pop() || 'jpg').toLowerCase(), type: f.type || 'image/jpeg'};
+  }
+
+  fileInput.addEventListener('change', async () => {
+    const files = [...fileInput.files];
+    if(!files.length) return;
+    try{
+      for(let i = 0; i < files.length; i++){
+        say(`Загружаю ${i+1} / ${files.length}…`);
+        const p = await shrink(files[i]);
+        const name = Date.now() + '-' + Math.random().toString(36).slice(2,8) + '.' + p.ext;
+        const {error} = await db.storage.from(BUCKET).upload(name, p.body, {contentType: p.type});
+        if(error){ say(explain(error.message), true); fileInput.value = ''; return; }
+      }
+      fileInput.value = ''; load();
+    }catch(err){ say('Сбой загрузки: ' + (err.message || err), true); fileInput.value = ''; }
   });
 
   const box = document.getElementById('lightbox');
