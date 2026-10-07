@@ -104,14 +104,21 @@
   .gtools{display:flex;flex-direction:column;gap:1rem;align-items:flex-start;font-size:.8rem;text-transform:uppercase}
   #status{min-height:1.2em}
   #grid{columns:3 280px;column-gap:1.2rem}
-  figure{position:relative;break-inside:avoid;margin-bottom:1.2rem;overflow:hidden;background:var(--black);cursor:zoom-in;opacity:0;transform:translateY(40px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+  figure{break-inside:avoid;margin-bottom:1.8rem;cursor:zoom-in;opacity:0;transform:translateY(40px);
+    transition:opacity .7s var(--ease),transform .7s var(--ease);filter:drop-shadow(5px 5px 0 rgba(17,17,17,.85))}
   figure.in{opacity:1;transform:none}
-  figure img{width:100%;display:block;filter:grayscale(1) contrast(1.25);mix-blend-mode:normal;transition:transform .7s var(--ease),filter .4s}
-  figure::before{content:"";position:absolute;inset:0;background:var(--red);mix-blend-mode:multiply;z-index:1;transition:transform .55s var(--ease);transform-origin:left}
-  figure:hover::before{transform:scaleX(0);transform-origin:right}
-  figure:hover img{transform:scale(1.06);filter:none}
-  figcaption{position:absolute;left:0;bottom:0;z-index:2;background:var(--black);color:var(--cream);font-size:.75rem;padding:.4rem .8rem;transform:translateY(100%);transition:transform .4s var(--ease)}
-  figure:hover figcaption{transform:none}
+  .paper{position:relative;background:#f7f3ea;padding:14px 14px 38px;clip-path:var(--tear);transition:transform .5s var(--ease)}
+  figure:nth-child(3n+1) .paper{transform:rotate(-1.2deg);--tear:polygon(0 1.5%,6% 0,13% 1.2%,21% 0,30% 1.4%,39% 0,49% 1.2%,58% 0,68% 1.4%,77% 0,87% 1.2%,95% 0,100% 1.5%,100% 98.6%,94% 100%,85% 98.4%,76% 100%,66% 98.6%,55% 100%,45% 98.4%,35% 100%,24% 98.6%,14% 100%,6% 98.4%,0 100%)}
+  figure:nth-child(3n+2) .paper{transform:rotate(1deg);--tear:polygon(0 0,8% 1.4%,17% 0,27% 1.2%,36% 0,46% 1.5%,55% 0,66% 1.2%,75% 0,85% 1.5%,100% 0,100% 100%,91% 98.5%,81% 100%,70% 98.4%,60% 100%,50% 98.6%,40% 100%,29% 98.4%,18% 100%,9% 98.6%,0 100%)}
+  figure:nth-child(3n) .paper{transform:rotate(-.4deg);--tear:polygon(0 1.2%,10% 0,22% 1.5%,35% 0,50% 1.2%,65% 0,80% 1.5%,100% 0,99.2% 20%,100% 45%,99.3% 70%,100% 100%,88% 98.6%,70% 100%,52% 98.5%,34% 100%,16% 98.6%,0 100%,.8% 75%,0 50%,.8% 25%)}
+  figure:hover .paper{transform:rotate(0) scale(1.03)}
+  .ph{position:relative;overflow:hidden;background:var(--black)}
+  .ph img{width:100%;display:block;filter:grayscale(1) contrast(1.25);transition:transform .7s var(--ease),filter .4s}
+  .ph::before{content:"";position:absolute;inset:0;background:var(--red);mix-blend-mode:multiply;z-index:1;transform-origin:left;transition:transform .55s var(--ease)}
+  figure:hover .ph::before{transform:scaleX(0);transform-origin:right}
+  figure:hover .ph img{transform:scale(1.06);filter:none}
+  figcaption{position:absolute;left:14px;bottom:9px;font-size:.72rem;letter-spacing:.08em;color:var(--black)}
+  #status.err{color:var(--red);font-weight:500;background:var(--black);padding:.5rem .8rem;max-width:34em;text-transform:none}
 
   /* ---------- LIGHTBOX ---------- */
   #lightbox{position:fixed;inset:0;z-index:300;background:var(--red);display:grid;place-items:center;clip-path:circle(0 at 50% 50%);transition:clip-path .7s var(--ease);pointer-events:none}
@@ -174,6 +181,18 @@
 
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const grid = document.getElementById('grid'), status = document.getElementById('status'), count = document.getElementById('count');
+  function say(msg, err){
+    status.textContent = msg; status.className = err ? 'err' : '';
+    if(err) console.error(msg);
+  }
+  function explain(m){
+    if(/row-level security|policy|not authorized|403/i.test(m)) return 'Нет прав: в Supabase нужна политика INSERT (и SELECT) для anon на бакет «' + BUCKET + '». (' + m + ')';
+    if(/not found|bucket/i.test(m)) return 'Бакет «' + BUCKET + '» не найден. Проверь название в Storage. (' + m + ')';
+    if(/mime|size|exceed/i.test(m)) return 'Файл не подошёл по типу или размеру. (' + m + ')';
+    return m;
+  }
+  const noKeys = SUPABASE_URL.includes('YOUR-') || SUPABASE_KEY.includes('YOUR-');
+  if(noKeys) say('Вставь свои SUPABASE_URL и SUPABASE_KEY в index.html — без них галерея не работает.', true);
 
   // бегущая строка
   const unit = '<span>ВИКУША</span><i>✕</i><span>ФОТОГАЛЕРЕЯ</span><i>✕</i>';
@@ -183,29 +202,30 @@
   const io = new IntersectionObserver(es => es.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }), {threshold:.1});
 
   async function load(){
+    if(noKeys) return;
     const {data, error} = await db.storage.from(BUCKET).list('', {limit:200, sortBy:{column:'created_at', order:'desc'}});
-    if(error){ status.textContent = 'Ошибка: ' + error.message; return; }
+    if(error){ say(explain(error.message), true); return; }
     const files = data.filter(f => f.name !== '.emptyFolderPlaceholder');
     grid.innerHTML = '';
     files.forEach((f, i) => {
       const url = db.storage.from(BUCKET).getPublicUrl(f.name).data.publicUrl;
       const fig = document.createElement('figure');
-      fig.innerHTML = `<img src="${url}" loading="lazy" alt=""><figcaption>№ ${String(files.length - i).padStart(2,'0')}</figcaption>`;
+      fig.innerHTML = `<div class="paper"><div class="ph"><img src="${url}" loading="lazy" alt=""></div><figcaption>№ ${String(files.length - i).padStart(2,'0')}</figcaption></div>`;
       fig.onclick = () => openBox(url);
       grid.appendChild(fig); io.observe(fig);
     });
     count.textContent = files.length + ' кадров';
-    status.textContent = files.length ? '' : 'Пока пусто — загрузи первое фото';
+    if(!noKeys) say(files.length ? '' : 'Пока пусто — загрузи первое фото');
   }
 
   document.getElementById('file').addEventListener('change', async e => {
     const files = [...e.target.files];
     for(let i = 0; i < files.length; i++){
-      status.textContent = `Загружаю ${i+1} / ${files.length}…`;
+      say(`Загружаю ${i+1} / ${files.length}…`);
       const ext = files[i].name.split('.').pop().toLowerCase();
       const name = Date.now() + '-' + Math.random().toString(36).slice(2,8) + '.' + ext;
-      const {error} = await db.storage.from(BUCKET).upload(name, files[i]);
-      if(error){ status.textContent = 'Ошибка: ' + error.message; return; }
+      const {error} = await db.storage.from(BUCKET).upload(name, files[i], {contentType: files[i].type || 'image/jpeg'});
+      if(error){ say(explain(error.message), true); e.target.value = ''; return; }
     }
     e.target.value = ''; load();
   });
