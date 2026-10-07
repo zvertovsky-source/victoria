@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Викуша — фотогалерея</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pink:#f0606b; --yellow:#ffe14d; --black:#111; --paper:#f1efe9;
+    /* Когда найдём кириллический аналог dröwner — поменять здесь */
+    --display:'Rubik','Arial Black',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  html{scroll-behavior:smooth}
+  body{font-family:var(--display);background:var(--black);color:var(--black)}
+
+  /* зерно поверх всего сайта */
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:99;opacity:.28;mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* ---------- HERO ---------- */
+  .hero{
+    min-height:100vh;background:var(--pink);position:relative;overflow:hidden;
+    display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:4vw;padding:6vw;
+  }
+  .photo{position:relative;aspect-ratio:3/4;max-height:80vh;justify-self:center;width:min(100%,520px)}
+  /* жёлтая рваная подложка, как на постере */
+  .photo::before{
+    content:"";position:absolute;inset:-6% -10% -4% -6%;background:var(--yellow);
+    clip-path:polygon(0 12%,18% 6%,26% 18%,38% 0,48% 16%,62% 4%,78% 14%,100% 0,100% 100%,0 100%);
+  }
+  .photo img{
+    position:relative;width:100%;height:100%;object-fit:cover;display:block;
+    filter:grayscale(1) contrast(1.5);mix-blend-mode:multiply;background:var(--yellow);
+  }
+  /* растр (halftone) поверх фото */
+  .photo::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(circle,transparent 38%,var(--yellow) 40%) 0 0/7px 7px;
+    mix-blend-mode:screen;opacity:.85;
+  }
+  .text{position:relative;z-index:2}
+  .tag{
+    display:inline-block;background:#d8231c;color:#fff;font-weight:500;font-size:1rem;
+    padding:.5em 1.6em;border-radius:99px;filter:blur(.6px);box-shadow:0 0 14px 6px rgba(216,35,28,.55);
+    margin-bottom:1.2rem;
+  }
+  h1{
+    font-weight:900;font-size:clamp(3.5rem,10vw,9.5rem);letter-spacing:-.06em;line-height:.9;
+    -webkit-text-stroke:.03em var(--black);paint-order:stroke fill;
+  }
+  .sub{font-weight:900;font-size:clamp(1.6rem,4vw,3.4rem);letter-spacing:-.05em;margin:.5rem 0 2.5rem}
+  .btn{
+    font:900 1.6rem var(--display);letter-spacing:-.03em;cursor:pointer;
+    background:var(--black);color:var(--paper);border:0;border-radius:99px;padding:.7em 1.8em;
+    box-shadow:6px 6px 0 var(--yellow);transition:transform .15s,box-shadow .15s;text-decoration:none;display:inline-block;
+  }
+  .btn:hover{transform:translate(-3px,-3px);box-shadow:9px 9px 0 var(--yellow)}
+  .btn:active{transform:translate(4px,4px);box-shadow:2px 2px 0 var(--yellow)}
+
+  /* ---------- ГАЛЕРЕЯ ---------- */
+  .gallery{min-height:100vh;background:var(--black);color:var(--paper);padding:8vw 6vw}
+  .gallery h2{font-weight:900;font-size:clamp(3rem,9vw,8rem);letter-spacing:-.06em;line-height:.9}
+  .bar{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin:2rem 0 3rem}
+  .bar .btn{background:var(--paper);color:var(--black);box-shadow:6px 6px 0 var(--pink)}
+  .bar .btn:hover{box-shadow:9px 9px 0 var(--pink)}
+  #status{font-weight:500;opacity:.7}
+  #grid{columns:3 260px;column-gap:1rem}
+  #grid img{
+    width:100%;display:block;margin-bottom:1rem;border-radius:18px;
+    filter:grayscale(1) contrast(1.15);transition:filter .25s,transform .25s;cursor:zoom-in;
+  }
+  #grid img:hover{filter:none;transform:rotate(-1deg) scale(1.02)}
+  #lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:100;cursor:zoom-out}
+  #lightbox img{max-width:92vw;max-height:92vh;border-radius:12px}
+  #lightbox.on{display:flex}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="photo"><img src="hero.jpg" alt="Главное фото"></div>
+  <div class="text">
+    <span class="tag">a photo gallery</span>
+    <h1>ВИКУША</h1>
+    <p class="sub">ФОТОГАЛЕРЕЯ</p>
+    <a class="btn" href="#gallery">СМОТРЕТЬ</a>
+  </div>
+</section>
+
+<section class="gallery" id="gallery">
+  <h2>фото</h2>
+  <div class="bar">
+    <label class="btn">+ ЗАГРУЗИТЬ
+      <input type="file" id="file" accept="image/*" multiple hidden>
+    </label>
+    <span id="status"></span>
+  </div>
+  <div id="grid"></div>
+</section>
+
+<div id="lightbox"><img alt=""></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // 1) Вставь свои данные из Supabase → Project Settings → API
+  const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+  const SUPABASE_KEY = 'YOUR-ANON-PUBLIC-KEY';
+  const BUCKET = 'photos';
+
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const grid = document.getElementById('grid');
+  const status = document.getElementById('status');
+
+  async function load(){
+    const {data, error} = await db.storage.from(BUCKET)
+      .list('', {limit:200, sortBy:{column:'created_at', order:'desc'}});
+    if(error){ status.textContent = 'Не удалось загрузить: ' + error.message; return; }
+    grid.innerHTML = '';
+    data.filter(f => f.name !== '.emptyFolderPlaceholder').forEach(f => {
+      const url = db.storage.from(BUCKET).getPublicUrl(f.name).data.publicUrl;
+      const img = new Image();
+      img.src = url; img.loading = 'lazy'; img.alt = '';
+      img.onclick = () => openBox(url);
+      grid.appendChild(img);
+    });
+    status.textContent = data.length ? '' : 'Пока пусто — загрузи первое фото';
+  }
+
+  document.getElementById('file').addEventListener('change', async e => {
+    const files = [...e.target.files];
+    for(let i = 0; i < files.length; i++){
+      status.textContent = `Загружаю ${i+1} из ${files.length}…`;
+      const f = files[i];
+      const ext = f.name.split('.').pop().toLowerCase();
+      const name = Date.now() + '-' + Math.random().toString(36).slice(2,8) + '.' + ext;
+      const {error} = await db.storage.from(BUCKET).upload(name, f);
+      if(error){ status.textContent = 'Ошибка: ' + error.message; return; }
+    }
+    e.target.value = '';
+    load();
+  });
+
+  const box = document.getElementById('lightbox');
+  function openBox(url){ box.querySelector('img').src = url; box.classList.add('on'); }
+  box.onclick = () => box.classList.remove('on');
+
+  load();
+</script>
+</body>
+</html>
