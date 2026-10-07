@@ -14,7 +14,7 @@
     --ease:cubic-bezier(.7,0,.2,1);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth}
+  html{scroll-behavior:smooth;overflow-anchor:none}
   body{font-family:var(--mono);background:var(--cream);color:var(--black);overflow-x:hidden}
   ::selection{background:var(--red);color:var(--cream)}
 
@@ -94,7 +94,7 @@
   .gallery h2{font:900 clamp(5rem,20vw,19rem)/.78 var(--head);letter-spacing:-.08em;color:var(--red);margin-left:-.04em}
   .gtools{display:flex;flex-direction:column;gap:1rem;align-items:flex-start;font-size:.8rem;text-transform:uppercase}
   #status{min-height:1.2em}
-  #grid{columns:3 280px;column-gap:1.2rem}
+  #grid{overflow-anchor:none;columns:3 280px;column-gap:1.2rem}
   figure{break-inside:avoid;margin-bottom:1.8rem;cursor:pointer;opacity:0;transform:translateY(40px);
     transition:opacity .7s var(--ease),transform .7s var(--ease);filter:drop-shadow(5px 5px 0 rgba(17,17,17,.85))}
   figure.in{opacity:1;transform:none}
@@ -106,8 +106,12 @@
   .ph{position:relative;overflow:hidden;background:var(--black)}
   .ph img{width:100%;display:block}
   /* ч/б слой лежит поверх цветного; по клику уезжает вправо */
-  .ph img.bw{position:absolute;inset:0;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.25);clip-path:inset(0 0 0 0);transition:clip-path .8s var(--ease)}
-  figure.color .ph img.bw{clip-path:inset(0 0 0 100%)}
+  .ph .mask{position:absolute;inset:0;overflow:hidden;transition:transform 1s cubic-bezier(.65,0,.35,1);will-change:transform}
+  .ph .mask img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.25);transition:transform 1s cubic-bezier(.65,0,.35,1);will-change:transform}
+  /* шторка уезжает вправо, а картинка внутри едет влево — фото остаётся на месте */
+  figure.color .ph .mask{transform:translateX(100%)}
+  figure.color .ph .mask img{transform:translateX(-100%)}
+  figure{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
   .open{position:absolute;right:14px;bottom:7px;font:500 .72rem var(--mono);letter-spacing:.08em;text-transform:uppercase;background:none;border:0;border-bottom:2px solid var(--red);color:var(--black);cursor:pointer;padding:0 0 1px;transition:background .3s,color .3s}
   .open:hover{background:var(--red);color:var(--cream)}
   figcaption{position:absolute;left:14px;bottom:9px;font-size:.72rem;letter-spacing:.08em;color:var(--black)}
@@ -137,7 +141,7 @@
       <span style="--i:0">В</span><span style="--i:1">И</span><span style="--i:2">К</span><span style="--i:3">У</span><span style="--i:4">Ш</span><span style="--i:5">А</span>
     </span></h1>
     <p class="sub">Фото<b>галерея</b></p>
-    <div><a class="btn" href="#gallery">Смотреть
+    <div><a class="btn" href="#gallery" id="look">Смотреть
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="square"><path d="M12 3v18M5 14l7 7 7-7"/></svg></a></div>
   </div>
   <div class="photo"><img src="hero.jpg" alt="Главное фото"><span class="vert">Photo gallery — view / upload</span></div>
@@ -186,6 +190,17 @@
   const noKeys = SUPABASE_URL.includes('YOUR-') || SUPABASE_KEY.includes('YOUR-');
   if(noKeys) say('Вставь свои SUPABASE_URL и SUPABASE_KEY в index.html — без них галерея не работает.', true);
 
+  // всегда открываем главную страницу сверху (а не галерею)
+  if('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  if(location.hash) history.replaceState(null, '', location.pathname + location.search);
+  const toTop = () => window.scrollTo(0, 0);
+  toTop();
+  window.addEventListener('load', () => { toTop(); setTimeout(toTop, 150); });
+  document.getElementById('look').addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('gallery').scrollIntoView({behavior:'smooth'});
+  });
+
   // бегущая строка
   const unit = '<span>ВИКУША</span><i>✕</i><span>ФОТОГАЛЕРЕЯ</span><i>✕</i>';
   document.getElementById('mq').innerHTML = unit.repeat(12);
@@ -202,7 +217,7 @@
     files.forEach((f, i) => {
       const url = db.storage.from(BUCKET).getPublicUrl(f.name).data.publicUrl;
       const fig = document.createElement('figure');
-      fig.innerHTML = `<div class="paper"><div class="ph"><img src="${url}" loading="lazy" alt=""><img class="bw" src="${url}" loading="lazy" alt=""></div><figcaption>№ ${String(files.length - i).padStart(2,'0')}</figcaption><button class="open" type="button">Открыть ↗</button></div>`;
+      fig.innerHTML = `<div class="paper"><div class="ph"><img src="${url}" loading="lazy" alt=""><div class="mask"><img src="${url}" alt=""></div></div><figcaption>№ ${String(files.length - i).padStart(2,'0')}</figcaption><button class="open" type="button">Открыть ↗</button></div>`;
       fig.onclick = e => e.target.closest('.open') ? openBox(url) : fig.classList.toggle('color');
       grid.appendChild(fig); io.observe(fig);
     });
