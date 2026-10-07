@@ -55,17 +55,8 @@
   .meta{font-size:.8rem;line-height:1.6;max-width:22em;text-transform:uppercase;border-left:3px solid var(--red);padding-left:1rem}
   h1{
     font:900 clamp(4.5rem,14.5vw,15rem)/.82 var(--head);letter-spacing:-.07em;color:var(--black);
-    margin-right:-12vw;position:relative;z-index:6;isolation:isolate;
-    padding:.14em .2em .1em;transform:rotate(-2.5deg);align-self:flex-start;
-    filter:drop-shadow(7px 7px 0 rgba(17,17,17,.9));
+    margin-right:-12vw;position:relative;z-index:6;
   }
-  /* рваная бумага: светлый лист + чёрный лист под ним */
-  h1::before,h1::after{
-    content:"";position:absolute;inset:0;z-index:-1;
-    clip-path:polygon(0 6%,4% 0,9% 5%,15% 1%,22% 6%,30% 0,38% 5%,46% 1%,55% 6%,63% 0,72% 5%,80% 1%,88% 6%,95% 0,100% 4%,100% 94%,96% 100%,90% 95%,83% 100%,74% 94%,66% 100%,57% 95%,48% 100%,39% 94%,30% 100%,21% 95%,12% 100%,5% 94%,0 98%);
-  }
-  h1::before{background:#f7f3ea}
-  h1::after{background:var(--black);inset:-4% -2% -6% -1%;transform:rotate(1.8deg);z-index:-2}
   h1 .w{display:block;overflow:hidden;padding-bottom:.06em}
   h1 span{display:inline-block;transform:translateY(105%);animation:up .9s var(--ease) forwards;animation-delay:calc(var(--i)*70ms + 200ms)}
   @keyframes up{to{transform:none}}
@@ -174,8 +165,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   // ↓↓↓ ВСТАВЬ СВОИ ДАННЫЕ (те же, что были в прошлой версии) ↓↓↓
-  const SUPABASE_URL = 'https://sdrbrtircgnhukyzowsc.supabase.co/rest/v1/';
-  const SUPABASE_KEY = 'sb_publishable_h1tekKtYfz-M7RyvCbjmxA_XKkxdOjv';
+  const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+  const SUPABASE_KEY = 'YOUR-ANON-PUBLIC-KEY';
   const BUCKET = 'photos';
   // ↑↑↑ ----------------------------------------------------- ↑↑↑
 
